@@ -4,29 +4,35 @@ const mysql = require('mysql2/promise');
 const app = express();
 app.use(express.json());
 
-// MySQL connection pool for serverless compatibility
+// Optimized connection pool
 const pool = mysql.createPool({
   host: 'database-1.c12wio0iwfy7.ap-south-1.rds.amazonaws.com',
   user: 'admin',
   password: 'Bharat0802',
   database: 'mydb',
   port: 3306,
-  connectionLimit: 10, // Max connections in pool
-  waitForConnections: true, // Queue requests if pool is busy
-  queueLimit: 0 // Unlimited queue
+  connectionLimit: 5,
+  waitForConnections: true,
+  queueLimit: 0,
+  connectTimeout: 5000
 });
 
-// GET all users
+// Test endpoint (no DB)
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Hello from Vercel!' });
+});
+
+// GET all users (limited)
 app.get('/api/users', async (req, res) => {
   try {
-    const [results] = await pool.query('SELECT * FROM students');
+    const [results] = await pool.query('SELECT * FROM users LIMIT 10');
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET single user by ID
+// GET single user
 app.get('/api/users/:id', async (req, res) => {
   try {
     const [results] = await pool.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
@@ -37,7 +43,7 @@ app.get('/api/users/:id', async (req, res) => {
   }
 });
 
-// POST create new user
+// POST new user
 app.post('/api/users', async (req, res) => {
   const { name, email } = req.body;
   if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
@@ -73,5 +79,4 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// Export for Vercel
 module.exports = app;
