@@ -9,7 +9,7 @@ const pool = mysql.createPool({
   host: 'database-2.cq9wgiyyqnpm.us-east-1.rds.amazonaws.com',
   user: 'admin',
   password: 'Bharat0802',
-  database: 'mydb',
+  database: 'mydb2',
   port: 3306,
   connectionLimit: 5,
   waitForConnections: true,
