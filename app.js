@@ -29,8 +29,8 @@ connection.connect((err) => {
 // API Endpoints
 
 // 1. GET all users
-app.get('/api/users', (req, res) => {
-  const query = 'SELECT * FROM users';
+app.get('/api/student', (req, res) => {
+  const query = 'SELECT * FROM students';
   connection.query(query, (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
