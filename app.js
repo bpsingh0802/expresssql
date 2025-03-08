@@ -17,7 +17,27 @@ const connection = mysql.createConnection({
   port: 3306
 });
 
-// Connect to database
+// Function to ensure connection is active
+function ensureConnection(callback) {
+  connection.ping((err) => {
+    if (err) {
+      console.error('Connection lost, attempting to reconnect:', err);
+      connection.connect((connectErr) => {
+        if (connectErr) {
+          console.error('Reconnection failed:', connectErr);
+          callback(connectErr);
+        } else {
+          console.log('Reconnected to the database');
+          callback(null);
+        }
+      });
+    } else {
+      callback(null);
+    }
+  });
+}
+
+// Connect to database initially
 connection.connect((err) => {
   if (err) {
     console.error('Error connecting to the database:', err);
@@ -26,12 +46,22 @@ connection.connect((err) => {
   console.log('Connected to the database');
 });
 
+// Wrap query execution with connection check
+function queryWithConnectionCheck(query, params, callback) {
+  ensureConnection((err) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    connection.query(query, params, callback);
+  });
+}
+
 // API Endpoints
 
 // 1. GET all users
 app.get('/api/users', (req, res) => {
-  const query = 'SELECT * FROM users';
-  connection.query(query, (err, results) => {
+  queryWithConnectionCheck('SELECT * FROM users', [], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -41,8 +71,7 @@ app.get('/api/users', (req, res) => {
 
 // 2. GET single user by ID
 app.get('/api/users/:id', (req, res) => {
-  const query = 'SELECT * FROM users WHERE id = ?';
-  connection.query(query, [req.params.id], (err, results) => {
+  queryWithConnectionCheck('SELECT * FROM users WHERE id = ?', [req.params.id], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -59,9 +88,7 @@ app.post('/api/users', (req, res) => {
   if (!name || !email) {
     return res.status(400).json({ message: 'Name and email are required' });
   }
-
-  const query = 'INSERT INTO users (name, email) VALUES (?, ?)';
-  connection.query(query, [name, email], (err, result) => {
+  queryWithConnectionCheck('INSERT INTO users (name, email) VALUES (?, ?)', [name, email], (err, result) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -77,8 +104,7 @@ app.post('/api/users', (req, res) => {
 // 4. PUT update user
 app.put('/api/users/:id', (req, res) => {
   const { name, email } = req.body;
-  const query = 'UPDATE users SET name = ?, email = ? WHERE id = ?';
-  connection.query(query, [name, email, req.params.id], (err, result) => {
+  queryWithConnectionCheck('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, req.params.id], (err, result) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -91,8 +117,7 @@ app.put('/api/users/:id', (req, res) => {
 
 // 5. DELETE user
 app.delete('/api/users/:id', (req, res) => {
-  const query = 'DELETE FROM users WHERE id = ?';
-  connection.query(query, [req.params.id], (err, result) => {
+  queryWithConnectionCheck('DELETE FROM users WHERE id = ?', [req.params.id], (err, result) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -103,91 +128,59 @@ app.delete('/api/users/:id', (req, res) => {
   });
 });
 
-
-
-
-
-
-
-
-
-// ... (previous code remains unchanged until after the DELETE endpoint)
-
 // Add School API
 app.post('/api/addSchool', (req, res) => {
   const { name, address, latitude, longitude } = req.body;
 
-  // Validation
   if (!name || !address || latitude === undefined || longitude === undefined) {
-    return res.status(400).json({ 
-      message: 'Name, address, latitude, and longitude are required' 
-    });
+    return res.status(400).json({ message: 'Name, address, latitude, and longitude are required' });
   }
 
-  // Additional validation for data types and ranges
-  if (typeof name !== 'string' || typeof address !== 'string') {
-    return res.status(400).json({ 
-      message: 'Name and address must be strings' 
-    });
-  }
-
-  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-    return res.status(400).json({ 
-      message: 'Latitude and longitude must be numbers' 
-    });
+  if (typeof name !== 'string' || typeof address !== 'string' || typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ message: 'Invalid data types' });
   }
 
   if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return res.status(400).json({ 
-      message: 'Invalid latitude or longitude values' 
-    });
+    return res.status(400).json({ message: 'Invalid latitude or longitude values' });
   }
 
-  const query = 'INSERT INTO schools (name, address, latitude, longitude) VALUES (?, ?, ?, ?)';
-  connection.query(query, [name, address, latitude, longitude], (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(201).json({
-      id: result.insertId,
-      name,
-      address,
-      latitude,
-      longitude,
-      created_at: new Date()
+  queryWithConnectionCheck('INSERT INTO schools (name, address, latitude, longitude) VALUES (?, ?, ?, ?)', 
+    [name, address, latitude, longitude], 
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.status(201).json({
+        id: result.insertId,
+        name,
+        address,
+        latitude,
+        longitude,
+        created_at: new Date()
+      });
     });
-  });
 });
 
-// List Schools API with distance sorting
+// List Schools API
 app.get('/api/listSchools', (req, res) => {
   const { latitude, longitude } = req.query;
 
-  // Validate user coordinates
   if (!latitude || !longitude) {
-    return res.status(400).json({ 
-      message: 'User latitude and longitude are required' 
-    });
+    return res.status(400).json({ message: 'User latitude and longitude are required' });
   }
 
   const userLat = parseFloat(latitude);
   const userLon = parseFloat(longitude);
 
-  if (isNaN(userLat) || isNaN(userLon) || 
-      userLat < -90 || userLat > 90 || 
-      userLon < -180 || userLon > 180) {
-    return res.status(400).json({ 
-      message: 'Invalid latitude or longitude values' 
-    });
+  if (isNaN(userLat) || isNaN(userLon) || userLat < -90 || userLat > 90 || userLon < -180 || userLon > 180) {
+    return res.status(400).json({ message: 'Invalid latitude or longitude values' });
   }
 
-  const query = 'SELECT * FROM schools';
-  connection.query(query, (err, results) => {
+  queryWithConnectionCheck('SELECT * FROM schools', [], (err, results) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
 
-    // Function to calculate distance between two coordinates (Haversine formula)
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
       const R = 6371; // Earth's radius in kilometers
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -197,10 +190,9 @@ app.get('/api/listSchools', (req, res) => {
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
         Math.sin(dLon/2) * Math.sin(dLon/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c; // Distance in kilometers
+      return R * c;
     };
 
-    // Add distance to each school and sort
     const schoolsWithDistance = results.map(school => ({
       ...school,
       distance: calculateDistance(userLat, userLon, school.latitude, school.longitude)
@@ -209,15 +201,6 @@ app.get('/api/listSchools', (req, res) => {
     res.json(schoolsWithDistance);
   });
 });
-
-// ... (rest of the code including app.listen and SIGTERM handler remains unchanged)
-
-
-
-
-
-
-
 
 // Start the server
 app.listen(port, () => {
