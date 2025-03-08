@@ -10,15 +10,14 @@ app.use(express.json());
 
 // Create MySQL connection
 const connection = mysql.createConnection({
-  host: 'database-1.c12wio0iwfy7.ap-south-1.rds.amazonaws.com',
+  host: 'database-2.cq9wgiyyqnpm.us-east-1.rds.amazonaws.com',
   user: 'admin',
   password: 'Bharat0802',
-  database: 'mydb',
+  database: 'mydb2',
   port: 3306
 });
-
 // Function to ensure connection is active
-function ensureConnection(callback) {
+function ensureConnection(callback) { 
   connection.ping((err) => {
     if (err) {
       console.error('Connection lost, attempting to reconnect:', err);
