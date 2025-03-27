@@ -31,7 +31,7 @@ JASON BODY:
 
 2. List Schools
 Method: GET
-Endpoint: https://express-sql-itak.vercel.app/api/listSchools?latitude=40.712776&longitude=-74.005974
+Endpoint:https://expresssql-5a6i.vercel.app//api/listSchools?latitude=40.712776&longitude=-74.005974
 
 
 Query Parameters:
